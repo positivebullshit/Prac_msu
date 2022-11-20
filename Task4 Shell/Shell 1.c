@@ -3,15 +3,13 @@
 #include <stdlib.h>
 
 FILE *in, *out;
-int c, lenword;
+int c;
 int flag_eof = 0, flag_eol = 0;
 
 void readword() {
-    char *word = NULL, *word2 = NULL;
-    int i = 0;
-    lenword = 50;
-    int flag_quote = 0;
-    int flag_and = 0, flag_or = 0, flag_arrow = 0;
+    char *word;
+    int i = 0, lenword = 50;
+    int flag_quote = 0, flag_and = 0, flag_or = 0, flag_arrow = 0;
     word = calloc(lenword + 1, sizeof (char));
     while ((c = fgetc(in) != EOF) && (c != '\n')) {
         if (c == '\"') {
@@ -25,82 +23,90 @@ void readword() {
         }
         // Everything lower is when text not in quotes:
         else if (c == ' ') {
-            break;
-        }
-        else if (c == '&') {
-
-            word[i++] = c;
-            flag_and++;
-            if (flag_and == 2)
-                break;
-        }
-        else if (c == '|') {
-            word[i++] = c;
-            flag_or++;
-            if (flag_or == 2)
-                break;
-        }
-        else if (c == '>') {
-            word[i++] = c;
-            flag_arrow++;
-            if (flag_arrow == 2)
-                break;
-        }
-        else if (c == ';') {
-            if (word == NULL) {
-                word[i++]   = c;
-                break;
-            }
-            else {
-
-                word = NULL;
-            }
-        }
-        else if (c == '<') {
-            word[i++] = c;
-            break;
-        }
-        else if (c == '(') {
-            word[i++] = c;
-            break;
-        }
-        else if (c == ')') {
-            word[i++] = c;
-            break;
-        }
-
-        else {  // Если не спецсимвол
-            if ((flag_and) || (flag_or) || (flag_arrow)){
-                add_to_list(word);
+            if (word != NULL) {
+                word[i] = '\0';
+                // add to list
                 free(word);
-                lenword = 50;
-                word = calloc(lenword + 1, sizeof (char));
-                i = 0;
+            }
+            break;
+        }
+        // if it's a special symbol let's add the word
+        else if ((c == '&') || (c == '|') || (c == ';') || (c == '>')
+            || (c == '<') || (c == ')') || (c == '(')) {
+            if (((flag_and) && (c == '&')) || ((flag_or) && (c == '|')) ||
+                    ((flag_arrow) && (c == '>'))) {
                 word[i++] = c;
+                word[i] = '\0';
+                // add to list
+                free(word);
+                break;
             }
             else {
+                if (word != NULL) {
+                    word[i] = '\0';
+                    // add to list
+                    free(word);
+                    lenword = 50, i = 0;
+                    word = calloc(lenword + 1, sizeof(char));
+                }
                 word[i++] = c;
+                if (c == '&') {
+                    flag_and++;
+                } else if (c == '|') {
+                    flag_or++;
+                } else if (c == '>') {
+                    flag_arrow++;
+                } else {
+                    word[i] = '\0';
+                    // add to list
+                    free(word);
+                    break;
+                }
             }
         }
-        if (word != NULL) {
-            add_to_list(word);
+        else {
+            if ((flag_and) || (flag_or) || (flag_arrow)) {
+                word[i] = '\0';
+                // add to list
+                free(word);
+                i = 0;
+                word = calloc(lenword + 1, sizeof (char));
+            }
+            word[i++] = c;
         }
-        if ((i == lenword - 2) || (i == lenword - 3)) {
+        if (i >= lenword - 3) {
             lenword *= 2;
             word = realloc(word, (lenword + 1) * sizeof (char));
         }
-        if (c == '\n') {
-            flag_eol = 1;
-        }
-        if (c == EOF) {
-            flag_eof = 1;
+    }
+
+
+    if ((c == '\n') || (c == EOF)){
+        flag_eol = (c == '\n');
+        flag_eof = (c == EOF);
+        if (word != NULL) {
+            word[i] = '\0';
+            // add to list
+            free(word);
         }
     }
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
 int main(int argc, char *argv[]) {
 
-    char *word;
+     //char *word;
 
     if (argc == 5) {
         in = fopen("r", argv[2]);
