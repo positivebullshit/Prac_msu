@@ -2,11 +2,14 @@
 #include <string.h>
 #include <stdlib.h>
 
+void s(int *a) {
+    int tmp = *a;
+    *a = tmp * tmp;
+}
 FILE *in, *out;
 int c;
-int flag_eof = 0, flag_eol = 0;
 
-void readword() {
+void readword(int flag_eof, int flag_eol) {
     char *word;
     int i = 0, lenword = 50;
     int flag_quote = 0, flag_and = 0, flag_or = 0, flag_arrow = 0;
@@ -105,8 +108,12 @@ void readword() {
 
 
 int main(int argc, char *argv[]) {
-
-     //char *word;
+    int n = 5;
+    printf("%d", n);
+    s(&n);
+    printf("%d", n);
+    int flag_eof = 0, flag_eol = 0;
+    char *word;
 
     if (argc == 5) {
         in = fopen("r", argv[2]);
@@ -130,11 +137,13 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     };
 
+    /*
     while (!flag_eof) {
         while ((!flag_eof) && (!flag_eol)) {
 
         }
     }
+     */
 
 }
 
