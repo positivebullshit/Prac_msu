@@ -6,8 +6,8 @@ FILE *in, *out;
 int c, lenword;
 int flag_eof = 0, flag_eol = 0;
 
-int readword() {
-    char *word = NULL;
+void readword() {
+    char *word = NULL, *word2 = NULL;
     int i = 0;
     lenword = 50;
     int flag_quote = 0;
@@ -20,61 +20,55 @@ int readword() {
         else if (flag_quote == 1) {
             word[i++] = c;
         }
-        else if (c == ' ') {
-            break;
-        }
-        else if ((c == '&') && (!flag_quote)) {
-            if (flag_and == 1) {
-                word[i++] = c;
-                flag_and = 0;
-                break;
-            }
-            else {
-                word[i++] = c;
-                flag_and++;
-            }
-        }
-        else if ((c == '|') && (!flag_quote)) {
-            if (flag_or == 1) {
-                word[i++] = c;
-                flag_or = 0;
-                break;
-            }
-            else {
-                flag_or++;
-                word[i++] = c;
-            }
-        }
-        else if ((c == '>') && (!flag_quote)) {
-            if (flag_arrow == 1) {
-                word[i++] = c;
-                flag_arrow = 0;
-                break;
-            }
-            else {
-                flag_arrow++;
-                word[i++] = c;
-            }
-        }
-        else if ((c == ';') && (!flag_quote)) {
-            word[i++] = c;
-            break;
-        }
-        else if ((c == '<') && (!flag_quote)) {
-            word[i++] = c;
-            break;
-        }
-        else if ((c == '(') && (!flag_quote)) {
-            word[i++] = c;
-            break;
-        }
-        else if ((c == ')') && (!flag_quote)) {
-            word[i++] = c;
-            break;
-        }
         else if (flag_quote == 2) {
             flag_quote = 0;
         }
+        // Everything lower is when text not in quotes:
+        else if (c == ' ') {
+            break;
+        }
+        else if (c == '&') {
+
+            word[i++] = c;
+            flag_and++;
+            if (flag_and == 2)
+                break;
+        }
+        else if (c == '|') {
+            word[i++] = c;
+            flag_or++;
+            if (flag_or == 2)
+                break;
+        }
+        else if (c == '>') {
+            word[i++] = c;
+            flag_arrow++;
+            if (flag_arrow == 2)
+                break;
+        }
+        else if (c == ';') {
+            if (word == NULL) {
+                word[i++]   = c;
+                break;
+            }
+            else {
+
+                word = NULL;
+            }
+        }
+        else if (c == '<') {
+            word[i++] = c;
+            break;
+        }
+        else if (c == '(') {
+            word[i++] = c;
+            break;
+        }
+        else if (c == ')') {
+            word[i++] = c;
+            break;
+        }
+
         else {  // Если не спецсимвол
             if ((flag_and) || (flag_or) || (flag_arrow)){
                 add_to_list(word);
@@ -137,3 +131,13 @@ int main(int argc, char *argv[]) {
     }
 
 }
+
+/*
+ * Идея алгоритма:
+ * Пока не конец файла:
+ *      Создали список
+ *      Пока не конец строки и не конец файла:
+ *          Считываем слово и сразу добавляем его в список
+ *      Выводим список слов
+ *      Очищаем список
+ */
