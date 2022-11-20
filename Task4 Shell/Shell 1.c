@@ -2,18 +2,37 @@
 #include <string.h>
 #include <stdlib.h>
 
-void s(int *a) {
-    int tmp = *a;
-    *a = tmp * tmp;
-}
 FILE *in, *out;
 int c;
 
-void readword(int flag_eof, int flag_eol) {
+typedef struct Node{
+    char *info;
+    struct Node *next;
+} Node;
+
+void push(Node **end_of_list, char *word, int len_word) {
+    Node *tmp = (Node*)malloc(sizeof(Node));
+    tmp->info = calloc(len_word + 1, sizeof (char));
+    strcpy(tmp->info, word);
+    tmp->next = NULL;
+    (*end_of_list)->next = tmp;
+    *end_of_list = tmp;
+}
+
+void print_list(Node **root) {
+    while ((*root) != NULL) {
+        if ((strcmp((*root)->info, ""))) {
+            printf("%s\n", (*root)->info);
+        }
+        *root = (*root)->next;
+    }
+}
+
+void readword(int *flag_eof, int *flag_eol, int *len_word, Node *last_elem) {
     char *word;
-    int i = 0, lenword = 50;
+    int i = 0, len = *len_word;
     int flag_quote = 0, flag_and = 0, flag_or = 0, flag_arrow = 0;
-    word = calloc(lenword + 1, sizeof (char));
+    word = calloc(len + 1, sizeof (char));
     while ((c = fgetc(in) != EOF) && (c != '\n')) {
         if (c == '\"') {
             flag_quote++;
@@ -49,8 +68,8 @@ void readword(int flag_eof, int flag_eol) {
                     word[i] = '\0';
                     // add to list
                     free(word);
-                    lenword = 50, i = 0;
-                    word = calloc(lenword + 1, sizeof(char));
+                    len = 50, i = 0;
+                    word = calloc(len + 1, sizeof(char));
                 }
                 word[i++] = c;
                 if (c == '&') {
@@ -73,26 +92,26 @@ void readword(int flag_eof, int flag_eol) {
                 // add to list
                 free(word);
                 i = 0;
-                word = calloc(lenword + 1, sizeof (char));
+                word = calloc(len + 1, sizeof (char));
             }
             word[i++] = c;
         }
-        if (i >= lenword - 3) {
-            lenword *= 2;
-            word = realloc(word, (lenword + 1) * sizeof (char));
+        if (i >= len - 3) {
+            len *= 2;
+            word = realloc(word, (len + 1) * sizeof (char));
         }
     }
 
-
     if ((c == '\n') || (c == EOF)){
-        flag_eol = (c == '\n');
-        flag_eof = (c == EOF);
+        *flag_eol = (c == '\n');
+        *flag_eof = (c == EOF);
         if (word != NULL) {
             word[i] = '\0';
             // add to list
             free(word);
         }
     }
+    *len_word = len;
 }
 
 
@@ -108,12 +127,11 @@ void readword(int flag_eof, int flag_eol) {
 
 
 int main(int argc, char *argv[]) {
-    int n = 5;
-    printf("%d", n);
-    s(&n);
-    printf("%d", n);
-    int flag_eof = 0, flag_eol = 0;
+
+    int flag_eof = 0, flag_eol = 0, len_word = 50;
     char *word;
+    Node *root = NULL;
+    Node *end = root;
 
     if (argc == 5) {
         in = fopen("r", argv[2]);
