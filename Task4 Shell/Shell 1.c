@@ -9,6 +9,7 @@ typedef struct Node{
     struct Node *next;
 } Node;
 
+// adding node in the end of singly linked list
 void push(Node **end_of_list, char *word, int len_word) {
     Node *tmp = (Node*)malloc(sizeof(Node));
     tmp->info = calloc(len_word + 1, sizeof (char));
@@ -27,22 +28,6 @@ void print_list(Node *root) {
     }
 }
 
-/*
-void clear_list(Node *root, Node **end_of_list_address){
-    Node *tmp;
-    *end_of_list_address = root;
-    while (root != NULL) {
-        tmp = root;
-        if ((strcmp(tmp->info, ""))) {
-            free(tmp->info);
-            free(tmp);
-        }
-        root = root->next;
-    }
-}
-*/
-
-
 void clear_list(Node **root_address, Node **end_of_list_address){
     Node *tmp_list = *root_address;
     Node *tmp_node;
@@ -57,39 +42,37 @@ void clear_list(Node **root_address, Node **end_of_list_address){
     *end_of_list_address = *root_address;
 }
 
-
-/*
-void clear_list(Node **root, Node **end_of_list) {
-    Node *tmp;
-    while ((*root) != NULL) {
-        tmp = *root;
-        if ((strcmp(tmp->info, ""))) {
-            free(tmp->info);
-        }
-        *root = (*root)->next;
-        free(tmp);
-    }
-}
-*/
-
 void read_word(int *flag_eof, int *flag_eol, int *len_word, Node **end_of_list) {
+
+    int c, i = 0, len = *len_word, flag_quote = 0, flag_and = 0, flag_or = 0, flag_arrow = 0;
     char *word;
-    int c;
-    int i = 0, len = *len_word;
-    int flag_quote = 0, flag_and = 0, flag_or = 0, flag_arrow = 0;
     word = calloc(len + 1, sizeof (char));
+
     while (((c = fgetc(in)) != EOF) && (c != '\n')) {
-        // printf("%c", c);
         if (c == '\"') {
             flag_quote++;
+
+            // reset the flags for the case when Spec1"Spec1"
+            // (for example &"&") or it will show:
+            // Spec1Spec1       &&
+            if ((flag_and) || (flag_or) || (flag_arrow)) {
+                word[i] = '\0';
+                push(end_of_list, word, len);  //add to list
+                free(word);
+                flag_and = flag_or = flag_arrow = 0;
+                len = 50, i = 0;
+                word = calloc(len, sizeof (char));
+            }
+
+            if (flag_quote == 2) {
+                flag_quote = 0;
+            }
+
         }
         else if (flag_quote == 1) {
             word[i++] = c;
         }
-        else if (flag_quote == 2) {
-            flag_quote = 0;
-        }
-        // Everything lower is when text not in quotes:
+        // Everything lower for the case when text is not in quotes:
         else if (c == ' ') {
             if (word != NULL) {
                 word[i] = '\0';
@@ -98,9 +81,10 @@ void read_word(int *flag_eof, int *flag_eol, int *len_word, Node **end_of_list) 
             }
             break;
         }
-        // if it's a special symbol let's add the word
+        // if it's a special symbol let's add the previous word
         else if ((c == '&') || (c == '|') || (c == ';') || (c == '>')
             || (c == '<') || (c == ')') || (c == '(')) {
+            // if it's paired special symbol:
             if (((flag_and) && (c == '&')) || ((flag_or) && (c == '|')) ||
                     ((flag_arrow) && (c == '>'))) {
                 word[i++] = c;
@@ -110,12 +94,19 @@ void read_word(int *flag_eof, int *flag_eol, int *len_word, Node **end_of_list) 
                 break;
             }
             else {
+                // add the previous word
                 if (word != NULL) {
                     word[i] = '\0';
                     push(end_of_list, word, len);  //add to list
                     free(word);
                     len = 50, i = 0;
                     word = calloc(len + 1, sizeof(char));
+
+                    // reset the flags for the case when Spec1Spec2Spec1
+                    // (for example &|&) or it will show:
+                    // Spec1            &
+                    // Spec2Spec1       |&
+                    flag_and = flag_or = flag_arrow = 0;
                 }
                 word[i++] = c;
                 if (c == '&') {
@@ -137,8 +128,9 @@ void read_word(int *flag_eof, int *flag_eol, int *len_word, Node **end_of_list) 
                 word[i] = '\0';
                 push(end_of_list, word, len);  //add to list
                 free(word);
-                i = 0;
+                len = 50, i = 0;
                 word = calloc(len + 1, sizeof (char));
+                flag_and = flag_or = flag_arrow = 0;
             }
             word[i++] = c;
         }
@@ -151,6 +143,8 @@ void read_word(int *flag_eof, int *flag_eol, int *len_word, Node **end_of_list) 
     if ((c == '\n') || (c == EOF)){
         *flag_eol = (c == '\n') ? 0 : 1;
         *flag_eof = (c == EOF) ? 0 : 1;
+
+        // add the last word of the line
         if (word != NULL) {
             word[i] = '\0';
             push(end_of_list, word, len);  //add to list
@@ -190,11 +184,6 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     };
 
-    /*
-    read_word(&flag_eof, &flag_eol, &len_word, &end);
-    print_list(&root);
-    */
-
     while (flag_eof) {
         while ((flag_eof) && (flag_eol)) {
             read_word(&flag_eof, &flag_eol, &len_word, &end);
@@ -206,9 +195,9 @@ int main(int argc, char *argv[]) {
 }
 
 /*
- * Идея алгоритма:
+ * Идея алгоритма
+ * Создали список
  * Пока не конец файла:
- *      Создали список
  *      Пока не конец строки и не конец файла:
  *          Считываем слово и сразу добавляем его в список
  *      Выводим список слов
