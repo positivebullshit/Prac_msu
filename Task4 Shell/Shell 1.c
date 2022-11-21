@@ -39,7 +39,6 @@ void push(Node **end_of_list, char *word, int len_word) {
     *end_of_list = tmp;
 }
 
-
 void print_list(Node *root) {
     while (root != NULL) {
         if ((strcmp(root->info, ""))) {
@@ -49,19 +48,17 @@ void print_list(Node *root) {
     }
 }
 
-void clear_list(Node **root_address, Node **end_of_list_address){
-    Node *tmp_list = *root_address;
-    Node *tmp_node;
-    while (tmp_list != NULL) {
-        tmp_node = tmp_list;
-        tmp_list = tmp_list->next;
-        if (strcmp(tmp_node->info, "")) {
-            free(tmp_node->info);
-            free(tmp_node);
+void clear_list(Node *root, Node **end_of_list_address) {
+    *end_of_list_address = root;
+    Node *tmp;
+    while (root != NULL) {
+        tmp = root;
+        root = root->next;
+        if ((strcmp(tmp->info, ""))) {
+            free(tmp->info);
+            free(tmp);
         }
     }
-    // (*root_address)->next = NULL;  // добавил в 6 утра хз зачем
-    *end_of_list_address = *root_address;
 }
 
 void read_word(int *flag_eof, int *flag_eol, int *len_word, Node **end_of_list) {
@@ -213,7 +210,7 @@ int main(int argc, char *argv[]) {
         }
         flag_eol = 1;
         print_list(root);
-        clear_list(&root, &end_of_list);
+        clear_list(root, &end_of_list);
     }
 
     fprintf(out, "%s\n", root->info);
