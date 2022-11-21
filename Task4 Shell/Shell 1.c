@@ -1,3 +1,23 @@
+/*
+ * Идея алгоритма
+ * Создали список
+ * Пока не конец файла:
+ *      Пока не конец строки и не конец файла:
+ *          Считываем слово и сразу добавляем его в список
+ *      Выводим список слов
+ *      Очищаем список
+ */
+
+/*
+void push(Node **end_of_list_address, char **word, int len_word) {
+    Node *tmp = calloc(1, sizeof(Node));
+    tmp->info = *word;
+    tmp->next = NULL;
+    (*end_of_list_address)->next = tmp;
+    *end_of_list_address = tmp;
+}
+ */
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -19,10 +39,11 @@ void push(Node **end_of_list, char *word, int len_word) {
     *end_of_list = tmp;
 }
 
+
 void print_list(Node *root) {
     while (root != NULL) {
         if ((strcmp(root->info, ""))) {
-            printf("%s\n", root->info);
+            fprintf(out, "%s\n", root->info);
         }
         root = root->next;
     }
@@ -39,6 +60,7 @@ void clear_list(Node **root_address, Node **end_of_list_address){
             free(tmp_node);
         }
     }
+    // (*root_address)->next = NULL;  // добавил в 6 утра хз зачем
     *end_of_list_address = *root_address;
 }
 
@@ -72,7 +94,7 @@ void read_word(int *flag_eof, int *flag_eol, int *len_word, Node **end_of_list) 
         else if (flag_quote == 1) {
             word[i++] = c;
         }
-        // Everything lower for the case when text is not in quotes:
+            // Everything lower for the case when text is not in quotes:
         else if (c == ' ') {
             if (word != NULL) {
                 word[i] = '\0';
@@ -81,12 +103,12 @@ void read_word(int *flag_eof, int *flag_eol, int *len_word, Node **end_of_list) 
             }
             break;
         }
-        // if it's a special symbol let's add the previous word
+            // if it's a special symbol let's add the previous word
         else if ((c == '&') || (c == '|') || (c == ';') || (c == '>')
-            || (c == '<') || (c == ')') || (c == '(')) {
+                 || (c == '<') || (c == ')') || (c == '(')) {
             // if it's paired special symbol:
             if (((flag_and) && (c == '&')) || ((flag_or) && (c == '|')) ||
-                    ((flag_arrow) && (c == '>'))) {
+                ((flag_arrow) && (c == '>'))) {
                 word[i++] = c;
                 word[i] = '\0';
                 push(end_of_list, word, len);  //add to list
@@ -157,23 +179,23 @@ void read_word(int *flag_eof, int *flag_eol, int *len_word, Node **end_of_list) 
 int main(int argc, char *argv[]) {
 
     int flag_eof = 1, flag_eol = 1, len_word = 50;
-    Node *root = (Node*)malloc(sizeof(Node));
+    Node *root = (Node*)malloc(sizeof(Node));  // root-pointer
     root->info = "";
     root->next = NULL;
-    Node *end = root;
+    Node *end_of_list = root;
 
     if (argc == 5) {
-        in = fopen("r", argv[2]);
-        out = fopen("r", argv[4]);
+        in = fopen(argv[2], "r");
+        out = fopen(argv[4], "w");
     }
     else if (argc == 3) {
         if (strcmp(argv[1], "-i") == 0) {
-            in = fopen("r", argv[2]);
+            in = fopen(argv[2], "r");
             out = stdout;
         }
         else if (strcmp(argv[1], "-o") == 0) {
             in = stdin;
-            out = fopen("r", argv[2]);
+            out = fopen(argv[2], "w");
         }
     }
     else if (argc == 1) {
@@ -182,24 +204,21 @@ int main(int argc, char *argv[]) {
     }
     else {
         return EXIT_FAILURE;
-    };
+    }
+
 
     while (flag_eof) {
         while ((flag_eof) && (flag_eol)) {
-            read_word(&flag_eof, &flag_eol, &len_word, &end);
+            read_word(&flag_eof, &flag_eol, &len_word, &end_of_list);
         }
         flag_eol = 1;
         print_list(root);
-        clear_list(&root, &end);
+        clear_list(&root, &end_of_list);
     }
-}
 
-/*
- * Идея алгоритма
- * Создали список
- * Пока не конец файла:
- *      Пока не конец строки и не конец файла:
- *          Считываем слово и сразу добавляем его в список
- *      Выводим список слов
- *      Очищаем список
- */
+    fprintf(out, "%s\n", root->info);
+    //free(root->info);
+    free(root);
+    fclose(in);
+    fclose(out);
+}

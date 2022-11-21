@@ -7,10 +7,9 @@ typedef struct Node{
     struct Node *next;
 } Node;
 
-void push(Node **end_of_list, char *word, int len_word) {
+void push(Node **end_of_list, char **word, int len_word) {
     Node *tmp = (Node*)malloc(sizeof(Node));
-    tmp->info = calloc(len_word + 1, sizeof (char));
-    strcpy(tmp->info, word);
+    tmp->info = *word;
     tmp->next = NULL;
     (*end_of_list)->next = tmp;
     *end_of_list = tmp;
@@ -42,12 +41,19 @@ void read_word(int *flag_eof, int *flag_eol, int *len_word, Node **end_of_list) 
 }
 
 int main() {
-    int flag_eof = 0, flag_eol = 0, len_word = 50;
-    Node *root = (Node *) malloc(sizeof(Node));
+    int lenword = 100;
+    char *word1 = "Hello, world";
+    char *word2 = "Hello, I ...";
+    char *word3 = "I'm sorry, it was a joke, don't kill me";
+
+    Node *root = (Node*)malloc(sizeof(Node));
     root->info = "";
     root->next = NULL;
     Node *end = root;
 
-    read_word(&flag_eof, &flag_eol, &len_word, &end);
+    push(&end, &word1, lenword);
+    word1 = NULL;
+    printf("%s\n", word1);
 
+    print_list(&root);
 }
