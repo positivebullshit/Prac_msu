@@ -25,21 +25,29 @@ void print_list(Node **root) {
     }
 }
 
+void new_read_word() {
+    int c;
+    while (((c = fgetc(stdin)) != EOF) && (c != '\n')) {
+        printf("%c", c);
+    }
+}
+
+void read_word(int *flag_eof, int *flag_eol, int *len_word, Node **end_of_list) {
+    int c;
+    int i = 0, len = *len_word;
+    int flag_quote = 0, flag_and = 0, flag_or = 0, flag_arrow = 0;
+    while (((c = fgetc(stdin)) != EOF) && (c != '\n')) {
+        printf("%c", c);
+    }
+}
 
 int main() {
-    int lenword = 100;
-    char *word1 = "Hello, world";
-    char *word2 = "Hello, I ...";
-    char *word3 = "I'm sorry, it was a joke, don't kill me";
-
-    Node *root = (Node*)malloc(sizeof(Node));
-    root->info = "\0";
+    int flag_eof = 0, flag_eol = 0, len_word = 50;
+    Node *root = (Node *) malloc(sizeof(Node));
+    root->info = "";
     root->next = NULL;
     Node *end = root;
 
-    push(&end, word1, lenword);
-    push(&end, word2, lenword);
-    push(&end, word3, lenword);
+    read_word(&flag_eof, &flag_eol, &len_word, &end);
 
-    print_list(&root);
 }
