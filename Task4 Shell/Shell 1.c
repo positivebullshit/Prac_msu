@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
 FILE *in, *out;
 
@@ -18,6 +20,15 @@ typedef struct Node{
     char *info;
     struct Node *next;
 } Node;
+
+int number_of_nodes(Node *root) {
+    int counter = 0;
+    while (root != NULL) {
+        counter++;
+        root = root->next;
+    }
+    return counter;
+}
 
 void print_list(Node *root) {
     while (root != NULL) {
@@ -49,6 +60,17 @@ void clear_list(Node *root, Node **end_of_list_address) {
         }
     }
     (*end_of_list_address)->next = NULL;
+}
+
+void list_to_array(Node *root, char **array, int number_of_words) {
+    Node *tmp;
+    int i;
+    tmp = root->next;
+    for (i = 0; i < number_of_words - 1; i++) {
+        array[i] = tmp->info;
+        tmp = tmp->next;
+    }
+    array[i] = NULL;
 }
 
 void read_word(int *flag_eof, int *flag_eol, int *len_word, Node **end_of_list) {
@@ -163,7 +185,7 @@ void read_word(int *flag_eof, int *flag_eol, int *len_word, Node **end_of_list) 
 
 int main(int argc, char *argv[]) {
 
-    int flag_eof = 1, flag_eol = 1, len_word = 50;
+    int flag_eof = 1, flag_eol = 1, len_word = 50, number_of_words = 0;
 
     Node *root = (Node*)malloc(sizeof(Node));  // root-pointer
     root->info = "";
@@ -198,7 +220,48 @@ int main(int argc, char *argv[]) {
             read_word(&flag_eof, &flag_eol, &len_word, &end_of_list);
         }
         flag_eol = 1;
-        print_list(root);
+
+        number_of_words = number_of_nodes(root);
+        char **array = calloc(number_of_words + 1, sizeof (char*));
+        list_to_array(root, array, number_of_words);
+
+        if (array[0] != NULL) {
+            if (!(strcmp(array[0], "cd"))) {
+                if (!array[1]) {
+                    chdir(getenv("HOME"));
+                }
+                else if (array[2]) {
+                    perror("Too many arguments");
+                }
+                else {
+                    if (chdir(array[1]) == -1) {
+                        perror("Wrong path");
+                    }
+                    else {
+                        chdir(array[1]);
+                    }
+                }
+            }
+            else if (!(strcmp(array[0], "exit"))) {
+                clear_list(root, &end_of_list);
+                free(array);
+                free(root);
+                exit(1);
+            }
+            else {
+                int pid = fork();
+                if (pid == -1) {
+                    perror("fork() failed");
+                }
+                else if (!pid) {
+                    execvp(array[0], array);
+                }
+                else {
+                    wait(NULL);
+                }
+            }
+        }
+        free(array);
         clear_list(root, &end_of_list);
     };
 
