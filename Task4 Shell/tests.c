@@ -7,20 +7,33 @@ typedef struct Node{
     struct Node *next;
 } Node;
 
-void push(Node **end_of_list, char **word, int len_word) {
-    Node *tmp = (Node*)malloc(sizeof(Node));
-    tmp->info = *word;
+void push(Node **end_of_list_address, char *word_address) {
+    Node *tmp = calloc(1, sizeof (Node));
+    tmp->info = word_address;
     tmp->next = NULL;
-    (*end_of_list)->next = tmp;
-    *end_of_list = tmp;
+    (*end_of_list_address)->next = tmp;
+    *end_of_list_address = tmp;
 }
 
-void print_list(Node **root) {
-    while ((*root) != NULL) {
-        if ((strcmp((*root)->info, ""))) {
-            printf("%s\n", (*root)->info);
+void print_list(Node *root) {
+    while (root != NULL) {
+        if ((strcmp(root->info, ""))) {
+            fprintf(stdout, "%s\n", root->info);
         }
+        root = root->next;
+    }
+}
+
+void clear_list(Node **root, Node **end_of_list_address) {
+    *end_of_list_address = *root;
+    Node *tmp;
+    while (*root != NULL) {
+        tmp = *root;
         *root = (*root)->next;
+        if ((strcmp(tmp->info, ""))) {
+            free(tmp->info);
+            free(tmp);
+        }
     }
 }
 
@@ -31,6 +44,7 @@ void new_read_word() {
     }
 }
 
+/*
 void read_word(int *flag_eof, int *flag_eol, int *len_word, Node **end_of_list) {
     int c;
     int i = 0, len = *len_word;
@@ -39,21 +53,53 @@ void read_word(int *flag_eof, int *flag_eol, int *len_word, Node **end_of_list) 
         printf("%c", c);
     }
 }
+*/
 
+void print_word(char **word) {
+    int len = strlen(*word);
+    for(int i = 0; i < len; i++) {
+        printf("%c\n", (*word)[i]);
+    }
+}
 int main() {
-    int lenword = 100;
-    char *word1 = "Hello, world";
-    char *word2 = "Hello, I ...";
-    char *word3 = "I'm sorry, it was a joke, don't kill me";
-
-    Node *root = (Node*)malloc(sizeof(Node));
+    Node *root = calloc(1, sizeof (Node));
     root->info = "";
     root->next = NULL;
     Node *end = root;
 
-    push(&end, &word1, lenword);
-    word1 = NULL;
-    printf("%s\n", word1);
+    int lenword = 100;
 
-    print_list(&root);
+    char *word = calloc(lenword + 1, sizeof (char));
+    word[0] = 'd';
+    word[1] = 'o';
+    word[2] = 'm';
+    word[3] = '\0';
+
+    push(&end, word);
+
+    word = calloc(lenword + 1, sizeof (char));
+    word[0] = 'e';
+    word[1] = 'd';
+    word[2] = 'a';
+    word[3] = '\0';
+
+    push(&end, word);
+
+    word = calloc(lenword + 1, sizeof (char));
+    word[0] = 'm';
+    word[1] = 'o';
+    word[2] = 'm';
+    word[3] = '\0';
+
+    push(&end, word);
+
+    print_list(root);
+
+    clear_list(&root, &end);
+
+    print_list(root);
+
+    free(root);
+    //free(end);
+
 }
