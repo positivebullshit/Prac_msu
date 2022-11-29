@@ -183,6 +183,122 @@ void read_word(int *flag_eof, int *flag_eol, int *len_word, Node **end_of_list) 
     *len_word = len;
 }
 
+char *spec_symbols[] = {"", "&", "&&", "|", "||", ";", ">", ">>", "<", "(", ")"};
+/*
+ * NOTSPECSYMB - read the name of flag and don't ask any questions
+ * BG - & - for background mode
+ * AND - &&
+ * PIPE - | - for conveyor realisation
+ * OR - ||
+ * SEMICOLON - ;
+ * OUT - > - output redirection, overwriting file
+ * ADD - >> - output redirection, adding to file
+ * IN - < - input redirection
+ * LEFTBRACKET - (
+ * RIGHTBRACKET - )
+ */
+enum flag {NOTSPECSYMB, BG, AND, PIPE, OR, SEMICOLON, OUT, ADD, IN, LEFTBRACKET, RIGHTBRACKET};
+
+enum flag check_the_elem(char *elem) {
+    for (enum flag i = NOTSPECSYMB + 1; i <= RIGHTBRACKET; i++) {
+        if (!(strcmp(elem, spec_symbols[i]))) {
+            return i;
+        }
+    }
+    return NOTSPECSYMB;
+}
+
+typedef struct command {
+    char **command_array;
+    int command_word_count;
+    int bg_fl, and_fl, or_fl, semicolon_fl, pipe_fl;  // flags
+    char *in_fd, *out_fd, *add_fd;
+    struct command *command_next;
+} command;
+
+void struct_initialization(command *cmd_struct) {
+    cmd_struct->command_array = NULL;
+    cmd_struct->command_word_count = 0;
+    cmd_struct->bg_fl = cmd_struct->and_fl = cmd_struct->or_fl = cmd_struct->semicolon_fl = cmd_struct->pipe_fl =  0;
+    cmd_struct->in_fd = cmd_struct->out_fd = cmd_struct->add_fd = NULL;
+}
+
+command *parcing_string_by_commands(char **cmd_array){
+    command *cmd_struct = (command*)malloc(sizeof(cmd_struct)), *root = cmd_struct;
+    struct_initialization(cmd_struct);
+    int res;
+    while (*cmd_array != NULL) {
+        res = check_the_elem(*cmd_array);
+        switch (res) {
+            // cmd_array++ - переход к следующему слову нашего массива слова
+            case NOTSPECSYMB:
+                cmd_struct->command_word_count++;
+                cmd_struct->command_array = (char**)realloc(cmd_struct->command_array, sizeof(char*) * (cmd_struct->command_word_count + 1));
+                cmd_struct->command_array[cmd_struct->command_word_count - 1] = *cmd_array;
+                cmd_struct->command_array[cmd_struct->command_word_count] = NULL;
+                cmd_array++;
+                break;
+            case BG:
+                cmd_array++;
+                cmd_struct->bg_fl = 1;
+                if (*cmd_array != NULL) {
+                    perror("There is nothing to be executed");
+                    return root;
+                }
+                else {
+                    cmd_struct->command_next = calloc(1, sizeof(cmd_struct));
+                    cmd_struct = cmd_struct->command_next;
+                    struct_initialization(cmd_struct);
+                }
+                break;
+            case AND:
+                cmd_struct->command_next = calloc(1, sizeof(cmd_struct));
+                cmd_struct = cmd_struct->command_next;
+                struct_initialization(cmd_struct);
+                cmd_struct->and_fl = 1;
+                cmd_array++;
+                break;
+            case PIPE:
+                cmd_struct->command_next = calloc(1, sizeof(cmd_struct));
+                cmd_struct = cmd_struct->command_next;
+                struct_initialization(cmd_struct);
+                cmd_struct->pipe_fl = 1;
+                cmd_array++;
+                break;
+            case OR:
+                cmd_struct->command_next = calloc(1, sizeof(cmd_struct));
+                cmd_struct = cmd_struct->command_next;
+                struct_initialization(cmd_struct);
+                cmd_struct->or_fl = 1;
+                cmd_array++;
+                break;
+            case SEMICOLON:
+                cmd_struct->command_next = calloc(1, sizeof(cmd_struct));
+                cmd_struct = cmd_struct->command_next;
+                struct_initialization(cmd_struct);
+                cmd_struct->semicolon_fl = 1;
+                cmd_array++;
+                break;
+            case OUT:
+                cmd_array++;
+                cmd_struct->out_fd = *cmd_array;
+                cmd_array++;
+                break;
+            case ADD:
+                cmd_array++;
+                cmd_struct->add_fd = *cmd_array;
+                cmd_array++;
+                break;
+            case IN:
+                cmd_array++;
+                cmd_struct->in_fd = *cmd_array;
+                cmd_array++;
+                break;
+            default:
+                break;
+        }
+    }
+}
 int main(int argc, char *argv[]) {
 
     int flag_eof = 1, flag_eol = 1, len_word = 50, number_of_words = 0;
@@ -237,9 +353,6 @@ int main(int argc, char *argv[]) {
                     if (chdir(array[1]) == -1) {
                         perror("Wrong path");
                     }
-                    else {
-                        chdir(array[1]);
-                    }
                 }
             }
             else if (!(strcmp(array[0], "exit"))) {
@@ -255,6 +368,8 @@ int main(int argc, char *argv[]) {
                 }
                 else if (!pid) {
                     execvp(array[0], array);
+                    perror(array[0]);
+                    exit(1);
                 }
                 else {
                     wait(NULL);
