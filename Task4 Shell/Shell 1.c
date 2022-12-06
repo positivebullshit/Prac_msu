@@ -13,6 +13,12 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <fcntl.h>
+
+
+#define STDIN 0
+#define STDOUT 1
+#define STDERR 2
 
 FILE *in, *out;
 
@@ -223,10 +229,10 @@ void struct_initialization(command *cmd_struct) {
     cmd_struct->in_fd = cmd_struct->out_fd = cmd_struct->add_fd = NULL;
 }
 
-command *parcing_string_by_commands(char **cmd_array){
-    command *cmd_struct = (command*)malloc(sizeof(cmd_struct)), *root = cmd_struct;
+command *parcing_string_by_commands(char **cmd_array) {
+    command *cmd_struct = (command*)malloc(sizeof(command)), *root = cmd_struct;
     struct_initialization(cmd_struct);
-    int res;
+    enum flag res;
     while (*cmd_array != NULL) {
         res = check_the_elem(*cmd_array);
         switch (res) {
@@ -241,39 +247,39 @@ command *parcing_string_by_commands(char **cmd_array){
             case BG:
                 cmd_array++;
                 cmd_struct->bg_fl = 1;
-                if (*cmd_array != NULL) {
-                    perror("There is nothing to be executed");
+                if (*cmd_array == NULL) {
+                    perror("There is nothing after &\n");
                     return root;
                 }
                 else {
-                    cmd_struct->command_next = calloc(1, sizeof(cmd_struct));
+                    cmd_struct->command_next = calloc(1, sizeof(command));
                     cmd_struct = cmd_struct->command_next;
                     struct_initialization(cmd_struct);
                 }
                 break;
             case AND:
-                cmd_struct->command_next = calloc(1, sizeof(cmd_struct));
+                cmd_struct->command_next = calloc(1, sizeof(command));
                 cmd_struct = cmd_struct->command_next;
                 struct_initialization(cmd_struct);
                 cmd_struct->and_fl = 1;
                 cmd_array++;
                 break;
             case PIPE:
-                cmd_struct->command_next = calloc(1, sizeof(cmd_struct));
+                cmd_struct->command_next = calloc(1, sizeof(command));
+                cmd_struct->pipe_fl = 1;
                 cmd_struct = cmd_struct->command_next;
                 struct_initialization(cmd_struct);
-                cmd_struct->pipe_fl = 1;
                 cmd_array++;
                 break;
             case OR:
-                cmd_struct->command_next = calloc(1, sizeof(cmd_struct));
+                cmd_struct->command_next = calloc(1, sizeof(command));
                 cmd_struct = cmd_struct->command_next;
                 struct_initialization(cmd_struct);
                 cmd_struct->or_fl = 1;
                 cmd_array++;
                 break;
             case SEMICOLON:
-                cmd_struct->command_next = calloc(1, sizeof(cmd_struct));
+                cmd_struct->command_next = calloc(1, sizeof(command));
                 cmd_struct = cmd_struct->command_next;
                 struct_initialization(cmd_struct);
                 cmd_struct->semicolon_fl = 1;
@@ -298,15 +304,105 @@ command *parcing_string_by_commands(char **cmd_array){
                 break;
         }
     }
+    return root;
 }
+
+int executing_a_command(command *cmd_struct) {
+    int command_number = 1;
+    int fd[2], file;
+    while (cmd_struct != NULL) {
+        int savestdin = dup(STDIN), savestdout = dup(STDOUT);
+        if ((cmd_struct->command_array != NULL) && (!(strcmp(cmd_struct->command_array[0], "cd")))) {
+            if (cmd_struct->command_array[1] == NULL) {
+                if (chdir(getenv("HOME")) == -1) {
+                    perror("Error with home directory\n");
+                    exit(1);
+                }
+            }
+            else if (cmd_struct->command_array[2]) {
+                perror("Too many arguments\n");
+                exit(1);
+            }
+            else {
+                if (chdir(cmd_struct->command_array[1]) == -1) {
+                    perror("Wrong path\n");
+                }
+            }
+
+        }
+        else if (cmd_struct->command_array != NULL && (!(strcmp(cmd_struct->command_array[0], "exit")))) {
+            exit(0);
+        }
+        else {
+            // Input/Output redirection
+            if (command_number > 1) {
+                dup2(fd[0], STDIN);
+                close(fd[0]);
+            }
+            if (cmd_struct->pipe_fl) {  // Each command with | after it
+                pipe(fd);
+                dup2(fd[1], STDOUT);
+                close(fd[1]);
+            }
+            int pid = fork();
+            if (!pid) {  // if True - child, else - father
+                if (cmd_struct->in_fd) {  // now input has to be cmd_struct->in_fd
+                    file = open(cmd_struct->in_fd, O_RDONLY);
+                    if (file == -1) {
+                        perror( cmd_struct->in_fd);
+                        exit(1);
+                    }
+                    dup2(file, STDIN);
+                    close(file);
+                }
+                else if (cmd_struct->out_fd) {  // now output has to be cmd_struct->out_fd
+                    file = open(cmd_struct->out_fd, O_WRONLY | O_CREAT | O_TRUNC, 0666);  // 0666 to make O_CREAT work correct
+                    if (file == -1) {
+                        perror( cmd_struct->out_fd);
+                        exit(1);
+                    }
+                    dup2(file, STDOUT);
+                    close(file);
+                }
+                else if (cmd_struct->add_fd) {  // now output should be added to existing file
+                    file = open(cmd_struct->add_fd, O_WRONLY | O_APPEND);
+                    if (file == -1) {
+                        perror( cmd_struct->add_fd);
+                        exit(1);
+                    }
+                    dup2(file, STDOUT);
+                    close(file);
+                }
+                //printf("%d\n", command_number);
+                execvp(cmd_struct->command_array[0], cmd_struct->command_array);
+                perror(cmd_struct->command_array[0]); // incorrect execvp so return 1
+                return 1;
+            }
+            else {
+                wait(NULL);
+            }
+        }
+        cmd_struct = cmd_struct->command_next;
+        command_number++;
+        dup2(savestdin, STDIN);
+        close(savestdin);
+        dup2(savestdout, STDOUT);
+        close(savestdout);
+        // stdin and stdout are default again
+    }
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
 
     int flag_eof = 1, flag_eol = 1, len_word = 50, number_of_words = 0;
-
+    int exit_fl;
     Node *root = (Node*)malloc(sizeof(Node));  // root-pointer
     root->info = "";
     root->next = NULL;
     Node *end_of_list = root;
+
+    command *one_line;
 
     if (argc == 5) {
         in = fopen(argv[2], "r");
@@ -339,47 +435,29 @@ int main(int argc, char *argv[]) {
 
         number_of_words = number_of_nodes(root);
         char **array = calloc(number_of_words + 1, sizeof (char*));
-        list_to_array(root, array, number_of_words);
+        list_to_array(root, array, number_of_words);  // array of separate words and symbols
 
         if (array[0] != NULL) {
-            if (!(strcmp(array[0], "cd"))) {
-                if (!array[1]) {
-                    chdir(getenv("HOME"));
-                }
-                else if (array[2]) {
-                    perror("Too many arguments");
-                }
-                else {
-                    if (chdir(array[1]) == -1) {
-                        perror("Wrong path");
-                    }
-                }
-            }
-            else if (!(strcmp(array[0], "exit"))) {
-                clear_list(root, &end_of_list);
-                free(array);
-                free(root);
-                exit(1);
-            }
-            else {
-                int pid = fork();
-                if (pid == -1) {
-                    perror("fork() failed");
-                }
-                else if (!pid) {
-                    execvp(array[0], array);
-                    perror(array[0]);
-                    exit(1);
-                }
-                else {
-                    wait(NULL);
-                }
+            if (strcmp(array[0], "")) {
+                one_line = parcing_string_by_commands(array);  // one_line - struct of commands
+                exit_fl = executing_a_command(one_line);
             }
         }
+
+        while (one_line != NULL) {
+            command *tmp = one_line;
+            one_line = one_line->command_next;
+            free(tmp->command_array);
+            free(tmp);
+        }
+
+
         free(array);
         clear_list(root, &end_of_list);
-    };
-
+        if (exit_fl) {
+            break;
+        }
+    }
     free(root);
     fclose(in);
     fclose(out);
