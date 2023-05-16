@@ -10,7 +10,7 @@ const char * TW [] = { "program", "int", "string", "boolean", "false", "true",
     "and", "or", "not", "if", "else", "while", "break", "read", "write", NULL };
 
 const char * TD [] = { "{", "}", ";", ",", ":", "=", "(", ")", "==", "<", ">", 
-    "<=", "!=", ">=", "+",  "-", "*", "/", NULL };
+    "<=", "!=", ">=", "+",  "-", "*", "/", "%", NULL };
 
 enum type_of_lex {
     LEX_PROGRAM,                                                                                            // 0
@@ -20,9 +20,9 @@ enum type_of_lex {
     LEX_WHILE, LEX_BREAK, LEX_READ, LEX_WRITE,                                                              // 11 - 14
     LEX_LCURLY, LEX_RCURLY, LEX_SEMICOLON, LEX_COMMA, LEX_COLON, LEX_ASSIGN, LEX_LPAREN, LEX_RPAREN,        // 15 - 22
     LEX_EQ, LEX_LESS, LEX_GREATER, LEX_LEQ, LEX_NEQ, LEX_GEQ,                                               // 23 - 28
-    LEX_PLUS, LEX_MINUS, LEX_TIMES, LEX_SLASH,                                                              // 29 - 32          
-    LEX_NUM, LEX_ID, LEX_STRLITERAL,                                                                        // 33 - 35
-    LEX_NULL,                                                                                               // 36
+    LEX_PLUS, LEX_MINUS, LEX_TIMES, LEX_SLASH, LEX_MOD,                                                     // 29 - 33         
+    LEX_NUM, LEX_ID, LEX_STRLITERAL,                                                                        // 34 - 36
+    LEX_NULL,                                                                                               // 37
 };
 
 class Lex {
@@ -47,7 +47,7 @@ ostream& operator<< (ostream &s, Lex l) {
     if (l.t_lex <= LEX_WRITE) {
         t = TW[l.t_lex];
     }
-    else if (l.t_lex <= LEX_SLASH) {
+    else if (l.t_lex <= LEX_MOD) {
         t = TD[l.t_lex - LEX_WRITE - 1];  
     }
     else if (l.t_lex == LEX_ID)
@@ -109,7 +109,7 @@ Lex Scanner::get_lex() {
 
             case H:
                 if (feof(fp)) {
-                    return Lex();  // 
+                    return Lex();  // Default constructor makes it LEX_NULL and stops "while (true)"
                 }
                 if (c == ' ' || c == '\n' || c == '\t');
                 else if (isalpha(c)) {
@@ -120,8 +120,8 @@ Lex Scanner::get_lex() {
                     n = c - '0';
                     CS = NUMB;
                 }
-                else if (c == '+' || c == '-' || c == '*' || c == '{' || c == '}' 
-                      || c == ';' || c == ',' || c == ':' || c == '(' || c == ')' ) {
+                else if (c == '+' || c == '-' || c == '*' || c == '{' || c == '}' || c == ';' 
+                      || c == ',' || c == ':' || c == '(' || c == ')' ||  c == '%') {
                     CS = SYMB;
                     ungetc(c, fp);
                 }
@@ -221,6 +221,117 @@ Lex Scanner::get_lex() {
         }
     } while (true);
 }
+
+class Parser {
+    Lex curr_lex;
+    type_of_lex c_type;
+    int c_val;
+    Scanner scan;
+
+    void gl() {  // get_lex full
+        curr_lex = scan.get_lex();
+        c_type = curr_lex.get_type();
+        c_val = curr_lex.get_value();
+    }
+    void P();  // program
+    void TN();  // type_name
+    void D();  // declaration
+    void E();  // Elem
+    void Expr();  // Expression
+public:
+    Parser(const char* program): scan(program) { }
+    void analyze();
+};
+
+void Parser::analyze() {
+    gl();
+    P();
+    if (c_type != LEX_NULL) {
+        throw curr_lex;
+    }
+    cout << "The program execution is succesful!" << endl;
+}
+
+void Parser::P() {  //program
+    if (c_type == LEX_PROGRAM) {
+        gl();
+    }
+    else {
+        throw curr_lex;
+    }
+    if (c_type == LEX_LCURLY) {
+        gl();
+    }
+    else {
+        throw curr_lex;
+    }
+    
+    // Вызовы следующих функций, спуск как таковой
+    TN();  // Type_name, which calls declaration D()
+
+    if (c_type == LEX_RCURLY) {
+        gl();
+    }
+    else {
+        throw curr_lex;
+    }
+}
+
+void Parser::TN() {  // type_name
+    while ((c_type == LEX_BOOLEAN) || (c_type == LEX_INT) || (c_type == LEX_STRING)) {
+        gl();
+        D();
+    }
+}
+
+void Parser::D() {  // declaration
+    if (c_type == LEX_ID) {
+        gl();
+        if (c_type == LEX_ASSIGN) {
+            gl();
+            if ((c_type == LEX_NUM) || (c_type == LEX_STRLITERAL)) {
+                gl();
+                if (c_type == LEX_COMMA) {
+                    D();
+                }
+                else if (c_type == LEX_SEMICOLON) {
+                    gl();
+                }
+                else {
+                    throw curr_lex;
+                }
+            }
+            else {
+                throw curr_lex;
+            }
+        }
+        else if (c_type == LEX_COMMA) {
+            D();
+        }
+        else if (c_type == LEX_SEMICOLON) {
+            gl();
+        }
+        else {
+            throw curr_lex;
+        }
+    }
+    else {
+        throw curr_lex;
+    }
+}
+
+/* на сегодня все, берегите себя и своих близких
+void Parser::E() {  // ELem
+    if ((c_type == LEX_ID) || (c_type == LEX_NUM) || (c_type == LEX_STRLITERAL)) {
+        gl();
+    }
+    else if (c_type == LEX_NOT) {
+        gl();
+        Expr();
+    }
+    
+}
+*/ 
 
 int main(int argc, char** argv) {
     try {
