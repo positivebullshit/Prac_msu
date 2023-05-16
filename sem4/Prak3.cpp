@@ -36,7 +36,7 @@ public:
     int get_value() const {
         return v_lex;
     }
-    friend ostream& operator<< (ostream &s, Lex l);  // добавил только
+    friend ostream& operator<< (ostream &s, Lex l); 
 };
 
 vector <string> TID; 
@@ -48,29 +48,30 @@ ostream& operator<< (ostream &s, Lex l) {
         t = TW[l.t_lex];
     }
     else if (l.t_lex <= LEX_SLASH) {
-        t = TD[l.t_lex - LEX_WRITE - 1];
+        t = TD[l.t_lex - LEX_WRITE - 1];  
     }
     else if (l.t_lex == LEX_ID)
     {
-        t = "IDENTIFICATOR";
+        t = "IDENTIFICATOR with number";
     }
     else if (l.t_lex == LEX_STRLITERAL)
     {
-        t = "STRLITERAL";
+        t = "STRLITERAL with number";
+        // t = TConst[l.v_lex];  //  This way if u want to print the string itself
     }
     else if (l.t_lex == LEX_NUM)
     {
-        t = "NUMBER";
+        t = "NUMBER =";
     }
     else 
         throw l;
-    s << t  << endl;
+    s << t << " " << l.v_lex << endl;
     return s;
 }
 
 class Scanner {
     FILE* fp; 
-    char c;
+    char c, c_prev;
     void gc() {
         c = fgetc(fp);
     }
@@ -99,19 +100,16 @@ public:
 
 Lex Scanner::get_lex() {
     enum state {H, IDENT, NUMB, STRING, COM, COMP, SYMB};
-    int n;
-    string buf;
+    int n, i1, i2;
+    string buf, s1, s2;
     state CS = H;
     do { 
         gc();
-        if (c == '=') {
-            cout << "OK";
-        }
         switch (CS) {
 
             case H:
                 if (feof(fp)) {
-                    return Lex();  // нужен ли тут type_of_lex хммм подумать
+                    return Lex();  // 
                 }
                 if (c == ' ' || c == '\n' || c == '\t');
                 else if (isalpha(c)) {
@@ -128,23 +126,25 @@ Lex Scanner::get_lex() {
                     ungetc(c, fp);
                 }
                 else if (c == '/') {
+                    c_prev = c;  // is necessary because we may ungetc twice
                     if (fpeek(fp) == '*') {
                         gc();
                         CS = COM;
                     }
                     else {
-                        ungetc(c, fp);
+                        ungetc(c_prev, fp);
                         CS = SYMB;
                     }
                 }
                 else if (c == '=' || c == '>' || c == '<' || c == '!') {
+                    c_prev = c;  // is necessary because we may ungetc twice
                     if (fpeek(fp) == '=') {
                         CS = COMP;
                     }
                     else {
                         CS = SYMB;
                     }
-                    ungetc(c, fp);
+                    ungetc(c_prev, fp);
                 }
                 else if (c == '"') {
                     CS = STRING;
@@ -189,9 +189,6 @@ Lex Scanner::get_lex() {
                         gc();
                         CS = H;
                     }
-                    else {
-                        ungetc(c, fp);  // а зачем мне тут ungetc...
-                    }
                 }
                 break;
 
@@ -207,24 +204,19 @@ Lex Scanner::get_lex() {
                 }
                 break;
 
-            case COMP: {  // { } are necessary
-                string s1 = "";
+            case COMP:   // { } are necessary
                 s1.push_back(c);
                 gc();
                 s1.push_back(c);
-                int i1 = lex_num(s1, TD);
+                i1 = lex_num(s1, TD);
                 return Lex((type_of_lex) (i1 + 15), i1 + 15);
                 break;
-                } 
+            
 
             case SYMB:
-                string ss = "";
-                ss.push_back(c);
-                // cout << c << endl;
-                // cout << ss << endl;
-                int ii = lex_num(ss, TD);
-                // cout << ss << " " << ii << endl;
-                return Lex((type_of_lex)(ii + 15), ii + 15);
+                s2.push_back(c);
+                i2 = lex_num(s2, TD);
+                return Lex((type_of_lex)(i2 + 15), i2 + 15);
                 break;
         }
     } while (true);
@@ -234,8 +226,11 @@ int main(int argc, char** argv) {
     try {
         Scanner p("program.txt");
         Lex temp;
-        for (int i = 0; i <= 10; i++) {
+        while (true) {
             temp = p.get_lex();
+            if (temp.get_type() == LEX_NULL) {
+                break;
+            }
             cout << temp;
         }
         return 0;
@@ -248,14 +243,4 @@ int main(int argc, char** argv) {
     catch (Lex l) {
         cout << "Unexpected Lexeme " << l << endl;
     }
-    // Lex lex;
-    // while (true) {
-    //     lex = get_lex();
-    //     if (lex.get_type() == LEX_NULL) {
-    //         break;
-    //     }
-    //     else {
-    //         cout << lex.get_type() << " " << lex.get_value()<< endl;
-    //     }
-    // }
 }
