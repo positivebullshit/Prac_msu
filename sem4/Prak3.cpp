@@ -159,6 +159,7 @@ Lex Scanner::get_lex() {
                     buf.push_back(c);
                 }
                 else {
+                    ungetc(c, fp);
                     int i = lex_num(buf, TW);
                     if (i == -1) {
                         TID.push_back(buf);
@@ -238,6 +239,12 @@ class Parser {
     void D();  // declaration
     void E();  // Elem
     void Expr();  // Expression
+    void E1();  // 1 expression
+    void O();  // Operations
+    bool Op();  // 1 operation
+    void A();  // Assign
+    void S();  
+    void N();
 public:
     Parser(const char* program): scan(program) { }
     void analyze();
@@ -268,6 +275,7 @@ void Parser::P() {  //program
     
     // Вызовы следующих функций, спуск как таковой
     TN();  // Type_name, which calls declaration D()
+    O();
 
     if (c_type == LEX_RCURLY) {
         gl();
@@ -292,6 +300,7 @@ void Parser::D() {  // declaration
             if ((c_type == LEX_NUM) || (c_type == LEX_STRLITERAL)) {
                 gl();
                 if (c_type == LEX_COMMA) {
+                    gl();
                     D();
                 }
                 else if (c_type == LEX_SEMICOLON) {
@@ -306,6 +315,7 @@ void Parser::D() {  // declaration
             }
         }
         else if (c_type == LEX_COMMA) {
+            gl();
             D();
         }
         else if (c_type == LEX_SEMICOLON) {
@@ -320,30 +330,189 @@ void Parser::D() {  // declaration
     }
 }
 
-/* на сегодня все, берегите себя и своих близких
-void Parser::E() {  // ELem
-    if ((c_type == LEX_ID) || (c_type == LEX_NUM) || (c_type == LEX_STRLITERAL)) {
+bool Parser::Op() {  // 1 operation
+    bool flag = false;
+    if (c_type == LEX_IF) {
         gl();
+        if (c_type == LEX_LPAREN) {
+            gl();
+        } else {
+            throw curr_lex;
+        }
+        Expr();
+        if (c_type == LEX_RPAREN) {
+            gl();
+        } else {
+            throw curr_lex;
+        }
+        Op();
+        if (c_type == LEX_ELSE) {
+            gl();
+            Op();
+        }
+        flag = true;
     }
-    else if (c_type == LEX_NOT) {
+    else if (c_type == LEX_WHILE) {
+        gl();
+        if (c_type == LEX_LPAREN) {
+            gl();
+        } else {
+            throw curr_lex;
+        }
+        Expr();
+        if (c_type == LEX_RPAREN) {
+            gl();
+        } else {
+            throw curr_lex;
+        }
+        Op();
+        flag = true;
+    }
+    else if (c_type == LEX_READ) {
+        gl();
+        if (c_type == LEX_LPAREN) {
+            gl();
+            if (c_type == LEX_ID) {
+                gl();
+                if (c_type == LEX_RPAREN) {
+                    gl();
+                    flag = true;
+                    if (c_type == LEX_SEMICOLON) {
+                        gl();
+                    } else {
+                        throw(curr_lex);
+                    }
+                } else {
+                    throw(curr_lex);
+                }
+            } else {
+                throw(curr_lex);
+            }            
+        } else {
+            throw(curr_lex);
+        }
+    }
+    else if (c_type == LEX_WRITE) {
+        gl();
+        if (c_type == LEX_LPAREN) {
+            gl();
+            Expr();
+            if (c_type == LEX_COMMA) {
+                while (c_type != LEX_RPAREN) {
+                    gl();
+                    Expr();
+                }
+            }
+            if (c_type == LEX_RPAREN) {
+                gl();
+                if (c_type == LEX_SEMICOLON) {
+                    gl();
+                    flag = true;
+                } else {
+                    throw curr_lex;
+                }
+            } else {
+                throw curr_lex;
+            }
+        } else {
+            throw curr_lex;
+        }
+    }
+    else if (c_type == LEX_ID) {
+        gl();
+        A();
+        if (c_type == LEX_SEMICOLON) {
+            gl();
+            flag = true;
+        } else {
+            throw(curr_lex);
+        }
+    }
+    else if (c_type == LEX_LCURLY) {
+        gl();
+        O();
+        if (c_type == LEX_RCURLY) {
+            gl();
+            flag = true;
+        } else {
+            throw curr_lex;
+        }
+    }
+    else if (c_type == LEX_BREAK) {
+        gl();
+        if (c_type == LEX_SEMICOLON) {
+            gl();
+            flag = true;
+        } else {
+            throw curr_lex;
+        }
+    }
+    return flag;    
+}
+
+void Parser::O() {
+    while (Op());
+}
+
+void Parser::A() {
+    if (c_type == LEX_ASSIGN) {
+        gl();
+        E1();
+    } else {
+        throw(curr_lex);
+    }
+}
+
+void Parser::Expr() 
+    {
+        E1();
+        if (c_type == LEX_LEQ || c_type == LEX_GEQ || c_type == LEX_LESS || 
+            c_type == LEX_GREATER|| c_type == LEX_NEQ || c_type == LEX_EQ)
+        {
+            gl();
+            E1();
+        }
+    }
+
+void Parser::E1() {
+    S();
+    while (c_type == LEX_PLUS || c_type == LEX_MINUS || c_type == LEX_OR) {
+            gl();
+            S();
+           }
+}
+
+void Parser::S() {
+    N();
+    while (c_type == LEX_TIMES || c_type == LEX_SLASH || c_type == LEX_AND) {
+        gl();
+        N();
+    }
+}
+
+void Parser::N() {
+    if (c_type == LEX_ID || c_type == LEX_NUM || c_type == LEX_STRLITERAL) {
+        gl();
+    } else if (c_type == LEX_NOT) {
+        gl();
+        N();
+    } else if (c_type == LEX_LPAREN) {
         gl();
         Expr();
+        if (c_type == LEX_RPAREN) {
+            gl();
+        } else {
+            throw curr_lex;
+        }
+    } else {
+        throw curr_lex;
     }
-    
 }
-*/ 
 
 int main(int argc, char** argv) {
     try {
-        Scanner p("program.txt");
-        Lex temp;
-        while (true) {
-            temp = p.get_lex();
-            if (temp.get_type() == LEX_NULL) {
-                break;
-            }
-            cout << temp;
-        }
+        Parser p("program.txt");
+        p.analyze();
         return 0;
     }
 
