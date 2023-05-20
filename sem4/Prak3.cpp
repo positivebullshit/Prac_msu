@@ -84,22 +84,24 @@ ostream& operator<< (ostream &s, Lex l) {
     }
     else if (l.t_lex == LEX_ID)
     {
-        t = "IDENTIFICATOR with number";
+        // t = "IDENTIFICATOR with number";
+        t = TID[l.v_lex].get_name();
     }
     else if (l.t_lex == LEX_STRLITERAL)
     {
-        t = "STRLITERAL with number";
-        // t = TConst[l.v_lex];  //  This way if u want to print the string itself
+        // t = "STRLITERAL with number";
+        t = TConst[l.v_lex];  //  This way if u want to print the string itself
     }
     else if (l.t_lex == LEX_NUM)
     {
-        t = "NUMBER =";
+        // t = "NUMBER =";
+        t = to_string(l.v_lex);
     }
     else if (l.t_lex == POLIZ_LABEL) {
-        t = "LABEL";
+        t = to_string(l.v_lex);
     }
     else if (l.t_lex == POLIZ_ADDRESS) {
-        t = "ADDRESS";
+        t = TID[l.v_lex].get_name();
     }
     else if (l.t_lex == POLIZ_GO) {
         t = "!";
@@ -109,7 +111,7 @@ ostream& operator<< (ostream &s, Lex l) {
     }
     else 
         throw l;
-    s << t << " " << l.v_lex << endl;
+    s << t << " ";
     return s;
 }
 
@@ -344,6 +346,7 @@ void Parser::analyze() {
     for (Lex l: poliz) {
         cout << l;
     }
+    cout << endl;
     cout << "The program execution is succesful!" << endl;
 }
 
