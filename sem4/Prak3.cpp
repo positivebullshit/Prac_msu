@@ -3,6 +3,8 @@
 #include <ctype.h>
 #include <cstring>
 #include <vector>
+#include <algorithm>
+#include <stack>
 
 using namespace std;
 
@@ -22,7 +24,11 @@ enum type_of_lex {
     LEX_EQ, LEX_LESS, LEX_GREATER, LEX_LEQ, LEX_NEQ, LEX_GEQ,                                               // 23 - 28
     LEX_PLUS, LEX_MINUS, LEX_TIMES, LEX_SLASH, LEX_MOD,                                                     // 29 - 33         
     LEX_NUM, LEX_ID, LEX_STRLITERAL,                                                                        // 34 - 36
-    LEX_NULL,                                                                                               // 37
+    POLIZ_LABEL,                                                                                            // 37
+    POLIZ_ADDRESS,                                                                                          // 38
+    POLIZ_GO,                                                                                               // 39
+    POLIZ_FGO,                                                                                              // 40
+    LEX_NULL,                                                                                               // 41
 };
 
 class Lex {
@@ -39,8 +45,34 @@ public:
     friend ostream& operator<< (ostream &s, Lex l); 
 };
 
-vector <string> TID; 
+class Ident {
+    string name;
+    type_of_lex type;
+    bool declare;
+    int value;
+public:
+    Ident (const string n): name(n), type(LEX_NULL), declare(false), value(0) { }
+    string get_name() const { return name; }
+    type_of_lex get_type() { return type; }
+    void put_type(type_of_lex t) { type = t; }
+    bool get_declare() const { return declare; }
+    void put_declare() { declare = true; }
+    int get_value() { return value; }
+    void put_value(int v) { value = v; }
+    bool operator== (const string& s) const { return name == s; }
+};
+
+vector <Ident> TID; 
 vector <string> TConst;
+
+int put (const string& buf) {
+    vector<Ident>::iterator k;
+    if ((k = find(TID.begin(), TID.end(), buf)) != TID.end()) {
+        return k - TID.begin();
+    }
+    TID.push_back(Ident(buf));
+    return TID.size() - 1;
+}
 
 ostream& operator<< (ostream &s, Lex l) {
     string t;
@@ -62,6 +94,18 @@ ostream& operator<< (ostream &s, Lex l) {
     else if (l.t_lex == LEX_NUM)
     {
         t = "NUMBER =";
+    }
+    else if (l.t_lex == POLIZ_LABEL) {
+        t = "LABEL";
+    }
+    else if (l.t_lex == POLIZ_ADDRESS) {
+        t = "ADDRESS";
+    }
+    else if (l.t_lex == POLIZ_GO) {
+        t = "!";
+    }
+    else if (l.t_lex == POLIZ_FGO) { 
+        t = "!F";
     }
     else 
         throw l;
@@ -162,8 +206,8 @@ Lex Scanner::get_lex() {
                     ungetc(c, fp);
                     int i = lex_num(buf, TW);
                     if (i == -1) {
-                        TID.push_back(buf);
-                        return Lex(LEX_ID, TID.size() - 1);
+                        int ind = put(buf);
+                        return Lex(LEX_ID, ind);
                     }
                     else {
                         return Lex((type_of_lex) i, i);
@@ -229,6 +273,10 @@ class Parser {
     int c_val;
     Scanner scan;
 
+    int idtype;
+    stack <int> st_int;
+    stack <type_of_lex> st_lex;
+
     void gl() {  // get_lex full
         curr_lex = scan.get_lex();
         c_type = curr_lex.get_type();
@@ -237,24 +285,60 @@ class Parser {
     void P();  // program
     void TN();  // type_name
     void D();  // declaration
-    void E();  // Elem
     void Expr();  // Expression
     void E1();  // 1 expression
     void O();  // Operations
     bool Op();  // 1 operation
     void A();  // Assign
-    void S();  
-    void N();
+    void T();  
+    void F();
+    void dec(type_of_lex type);
+    void check_id();
+    void check_op();
+    void check_not();
+    void eq_type();
+    void eq_bool();
+    void check_id_in_read();
+    void set_idtype();
 public:
     Parser(const char* program): scan(program) { }
     void analyze();
+    void idtype_res() {
+        idtype = 0;
+    }
+    void idtype_boolean() {
+        idtype = 1;
+    }
+    void idtype_int() {
+        idtype = 2;
+    }
+    void idtype_string() {
+        idtype = 3;
+    }
+    vector <Lex> poliz;
 };
+
+void Parser::set_idtype() {
+    idtype_res();
+    if (c_type == LEX_BOOLEAN) {
+        idtype_boolean();
+    } 
+    else if (c_type == LEX_INT) {
+        idtype_int();
+    }
+    else if (c_type == LEX_STRING) {
+        idtype_string();
+    }
+}
 
 void Parser::analyze() {
     gl();
     P();
     if (c_type != LEX_NULL) {
         throw curr_lex;
+    }
+    for (Lex l: poliz) {
+        cout << l << endl;
     }
     cout << "The program execution is succesful!" << endl;
 }
@@ -287,6 +371,7 @@ void Parser::P() {  //program
 
 void Parser::TN() {  // type_name
     while ((c_type == LEX_BOOLEAN) || (c_type == LEX_INT) || (c_type == LEX_STRING)) {
+        set_idtype();
         gl();
         D();
     }
@@ -294,10 +379,25 @@ void Parser::TN() {  // type_name
 
 void Parser::D() {  // declaration
     if (c_type == LEX_ID) {
+        st_int.push(c_val);
+        if (idtype == 1) {
+            dec(LEX_BOOLEAN);
+            st_lex.push(LEX_BOOLEAN);
+        }
+        else if (idtype == 2) {
+            dec(LEX_INT);
+            st_lex.push(LEX_INT);
+        } 
+        else if (idtype == 3) {
+            dec(LEX_STRING);
+            st_lex.push(LEX_STRING);
+        }
+        
         gl();
         if (c_type == LEX_ASSIGN) {
             gl();
-            if ((c_type == LEX_NUM) || (c_type == LEX_STRLITERAL)) {
+            if (c_type == LEX_NUM || c_type == LEX_STRLITERAL || 
+                 c_type == LEX_TRUE || c_type == LEX_FALSE) {
                 gl();
                 if (c_type == LEX_COMMA) {
                     gl();
@@ -331,6 +431,7 @@ void Parser::D() {  // declaration
 }
 
 bool Parser::Op() {  // 1 operation
+    int p0, p1, p2, p3;
     bool flag = false;
     if (c_type == LEX_IF) {
         gl();
@@ -373,6 +474,7 @@ bool Parser::Op() {  // 1 operation
         if (c_type == LEX_LPAREN) {
             gl();
             if (c_type == LEX_ID) {
+                check_id();
                 gl();
                 if (c_type == LEX_RPAREN) {
                     gl();
@@ -419,6 +521,7 @@ bool Parser::Op() {  // 1 operation
         }
     }
     else if (c_type == LEX_ID) {
+        check_id();
         gl();
         A();
         if (c_type == LEX_SEMICOLON) {
@@ -458,6 +561,7 @@ void Parser::A() {
     if (c_type == LEX_ASSIGN) {
         gl();
         E1();
+        eq_type();
     } else {
         throw(curr_lex);
     }
@@ -469,34 +573,59 @@ void Parser::Expr()
         if (c_type == LEX_LEQ || c_type == LEX_GEQ || c_type == LEX_LESS || 
             c_type == LEX_GREATER|| c_type == LEX_NEQ || c_type == LEX_EQ)
         {
+            st_lex.push(c_type);
             gl();
             E1();
+            check_op();
         }
     }
 
 void Parser::E1() {
-    S();
+    T();
     while (c_type == LEX_PLUS || c_type == LEX_MINUS || c_type == LEX_OR) {
+            st_lex.push(c_type);
             gl();
-            S();
-           }
-}
-
-void Parser::S() {
-    N();
-    while (c_type == LEX_TIMES || c_type == LEX_SLASH || c_type == LEX_AND) {
-        gl();
-        N();
+            T();
+            check_op();
     }
 }
 
-void Parser::N() {
-    if (c_type == LEX_ID || c_type == LEX_NUM || c_type == LEX_STRLITERAL) {
+void Parser::T() {
+    F();
+    while (c_type == LEX_TIMES || c_type == LEX_SLASH || c_type == LEX_AND || c_type == LEX_MOD) {
+        st_lex.push(c_type);
         gl();
-    } else if (c_type == LEX_NOT) {
+        F();
+        check_op();
+    }
+}
+
+void Parser::F() {
+    if (c_type == LEX_ID) {
+        check_id();
         gl();
-        N();
-    } else if (c_type == LEX_LPAREN) {
+    }
+    else if (c_type == LEX_NUM) {
+        st_lex.push(LEX_INT);
+        gl();
+    }
+    else if (c_type == LEX_STRLITERAL) {
+        st_lex.push(LEX_STRING);
+        gl();
+    } else if (c_type == LEX_TRUE) {
+        st_lex.push(LEX_BOOLEAN);
+        gl();
+    } 
+    else if (c_type == LEX_FALSE) {
+        st_lex.push(LEX_BOOLEAN);
+        gl();
+    }
+    else if (c_type == LEX_NOT) {
+        gl();
+        F();
+        check_not();
+    } 
+    else if (c_type == LEX_LPAREN) {
         gl();
         Expr();
         if (c_type == LEX_RPAREN) {
@@ -506,6 +635,101 @@ void Parser::N() {
         }
     } else {
         throw curr_lex;
+    }
+}
+
+void Parser::dec(type_of_lex type) {
+    int i;
+    while (!st_int.empty()) {
+        i = st_int.top();
+        st_int.pop();
+        if (TID[i].get_declare()) {
+            throw "twice";
+        } else {
+            TID[i].put_declare();
+            TID[i].put_type(type);
+        }
+    }
+}
+
+void Parser::check_id() {
+    if (TID[c_val].get_declare()) {
+        st_lex.push(TID[c_val].get_type());
+    } else {
+        throw "not declared";
+    }
+}
+
+
+void Parser::check_op() {
+    type_of_lex t1, t2, op, r = LEX_NULL;
+    t2 = st_lex.top();
+    st_lex.pop();
+    op = st_lex.top();
+    st_lex.pop();
+    t1 = st_lex.top();
+    st_lex.pop();
+    if (t1 != t2) {
+        throw "wrong types are in operation";
+    }
+    if (op == LEX_MINUS || op == LEX_TIMES || op == LEX_SLASH || op == LEX_MOD) {
+        r = LEX_INT;
+        if (t1 != r) {
+            throw "wrong types are in operation";
+        }
+    }
+    else if (op == LEX_AND || op == LEX_OR) {
+        r = LEX_BOOLEAN;
+        if (t1 != r) {
+            throw "wrong types are in operation";
+        }
+    }
+    else if (op == LEX_LEQ || op == LEX_GEQ || op == LEX_LESS ||
+             op == LEX_GREATER|| op == LEX_NEQ || op == LEX_EQ) {
+        r = LEX_BOOLEAN;
+        if (t1 == LEX_BOOLEAN) {
+            throw "wrong types are in operation";
+        }
+    }
+    else if (op == LEX_PLUS) {
+        if (t1 == LEX_BOOLEAN) {
+            throw "wrong types are in operation";
+        }
+        r = t1;
+    }
+    if (r != LEX_NULL) {
+        st_lex.push(r); 
+    } else {
+        throw "wrong types are in operation";
+    }
+}
+
+void Parser::check_not() {
+    if (st_lex.top() != LEX_BOOLEAN) {
+        throw "wrong type is in not";
+    }
+    poliz.push_back(Lex(LEX_NOT));
+}
+
+void Parser::eq_type() {
+    type_of_lex t;
+    t = st_lex.top();
+    st_lex.pop();
+    if (t != st_lex.top())
+        throw "wrong types are in assign";
+    st_lex.pop();
+}
+
+void Parser::eq_bool() {
+    if (st_lex.top() != LEX_BOOLEAN) {
+        throw "expression is not boolean";
+    st_lex.pop ();
+    }
+}
+
+void Parser::check_id_in_read() {
+    if (!TID[c_val].get_declare()) {
+        throw "not declared";
     }
 }
 
