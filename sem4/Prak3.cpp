@@ -300,6 +300,7 @@ class Parser {
     void eq_bool();
     void check_id_in_read();
     void set_idtype();
+    void change_break();
 public:
     Parser(const char* program): scan(program) { }
     void analyze();
@@ -316,6 +317,8 @@ public:
         idtype = 3;
     }
     vector <Lex> poliz;
+    vector <int> st_while;
+    vector <int> fin_while;
 };
 
 void Parser::set_idtype() {
@@ -337,6 +340,7 @@ void Parser::analyze() {
     if (c_type != LEX_NULL) {
         throw curr_lex;
     }
+    change_break();
     for (Lex l: poliz) {
         cout << l;
     }
@@ -475,6 +479,7 @@ bool Parser::Op() {  // 1 operation
         Expr();
         eq_bool();
         p1 = poliz.size();
+        st_while.push_back(p0);
         poliz.push_back(Lex());
         poliz.push_back(Lex(POLIZ_FGO));
         if (c_type == LEX_RPAREN) {
@@ -485,6 +490,7 @@ bool Parser::Op() {  // 1 operation
         Op();
         poliz.push_back(Lex(POLIZ_LABEL, p0));
         poliz.push_back(Lex(POLIZ_GO));
+        fin_while.push_back(poliz.size());
         poliz[p1] = Lex(POLIZ_LABEL, poliz.size());
         flag = true;
     }
@@ -568,6 +574,7 @@ bool Parser::Op() {  // 1 operation
     else if (c_type == LEX_BREAK) {
         gl();
         if (c_type == LEX_SEMICOLON) {
+            poliz.push_back(Lex(LEX_BREAK));
             gl();
             flag = true;
         } else {
@@ -763,6 +770,24 @@ void Parser::check_id_in_read() {
     }
     if (TID[c_val].get_type() == LEX_BOOLEAN) {
         throw "Identificator can't be boolean";
+    }
+}
+
+void Parser::change_break() {
+    int k = 0;
+    for (Lex l: poliz) {
+        if (l.get_type() == LEX_BREAK) {
+            int num_while = st_while.size();
+                for (int i = num_while - 1; i >= 0; i--) {
+                    if (st_while[i] < k) {
+                        if (fin_while[i] > k) {
+                            poliz[k] = Lex(POLIZ_LABEL, fin_while[i]);
+                            break;
+                        }
+                    }
+                }
+        }
+    k++;
     }
 }
 
